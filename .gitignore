@@ -1,0 +1,16 @@
+/.stack-work/
+/active/.stack-work/
+/diagrams/.stack-work/
+/geometry/.stack-work/
+/gi-cairo-connector/.stack-work/
+/gi-cairo-render/.stack-work/
+/monoid-extras/.stack-work/
+*.svg
+
+/active/.gitignore
+/active/.travis.yml
+/diagrams/.gitignore
+/geometry/.gitignore
+/geometry/.travis.yml
+/monoid-extras/.gitignore
+/monoid-extras/.travis.yml
