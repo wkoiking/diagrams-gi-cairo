@@ -15,7 +15,7 @@ extra-deps: # []
 - diagrams
 - active
 - monoid-extras
-- gi-pangocairo-1.0.23
+- gi-pangocairo-1.0.24
 - haskell-gi-base-0.24.2
 - haskell-gi-0.24.4
 - gi-pango-1.0.23

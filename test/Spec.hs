@@ -7,7 +7,7 @@ import Diagrams.TwoD.Text
 import Diagrams.Backend.Cairo (Cairo(..))
 
 main :: IO ()
-main = saveDiagram Cairo "Test.png" (mkWidth 6000) $ center $ lw thick $ bg lightgray $ mconcat
+main = saveDiagram Cairo "Test.png" (mkWidth 500) $ center $ lw thick $ bg lightgray $ mconcat
     [ circle 2
-    , text "abcde"
+    , rotate (45 @@ deg) $ font "Arial" $ fontWeight FontWeightBold $ fc blue $ text "ABC"
     ]

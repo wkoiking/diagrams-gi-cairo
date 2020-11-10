@@ -468,7 +468,7 @@ layoutStyledText tt sty (Text al str) = do
       ff = fmap T.pack $ getAttr _Font sty
       fs = fromFontSlant <$> getAttr _FontSlant sty
       fw = fromFontWeight <$> getAttr _FontWeight sty
-      size' = getAttr _FontSize sty
+      size' = fmap puToInt $ getAttr _FontSize sty
   cairoTransf tr -- non-uniform scale
   cr <- Connect.getContext
   layout <- P.createLayout cr
@@ -493,6 +493,7 @@ layoutStyledText tt sty (Text al str) = do
       return $ r2 (0, fromIntegral baseline)
   let t = moveOriginBy ref mempty :: T2 Double
   cairoTransf t
+  cr <- Connect.getContext
   P.updateLayout cr layout
   return layout
 
@@ -575,7 +576,7 @@ pangoTextIO
   :: PangoOptions
   -> String
   -> IO (Diagram V2)
-pangoTextIO opts@(PangoOptions {..}) str = do
+pangoTextIO opts@(PangoOptions{..}) str = do
   bb <- fontBB opts str
   return $ mkQD (Prim (Text BaselineText str)) (getEnvelope bb) mempty mempty
     # fontSizeL pangoSize
