@@ -472,6 +472,7 @@ layoutStyledText tt sty (Text al str) = do
   cairoTransf tr -- non-uniform scale
   cr <- Connect.getContext
   layout <- P.createLayout cr
+  P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
   -- set font, including size
   liftIO $ do
     fontD <- P.fontDescriptionNew
