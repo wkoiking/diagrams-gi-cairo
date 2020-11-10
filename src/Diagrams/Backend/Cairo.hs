@@ -532,9 +532,10 @@ lay
   -> String
 --   -> C.Render P.PangoLayout
   -> C.Render P.Layout
-lay PangoOptions {..} str = do
+lay PangoOptions{..} str = do
   cr <- Connect.getContext
   layout <- P.createLayout cr
+  P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
   -- set font, including size
   C.liftIO $ do
     fontD <- P.fontDescriptionNew
