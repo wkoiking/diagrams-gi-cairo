@@ -493,7 +493,6 @@ layoutStyledText tt sty (Text al str) = do
       return $ r2 (0, fromIntegral baseline)
   let t = moveOriginBy ref mempty :: T2 Double
   cairoTransf t
-  cr <- Connect.getContext
   P.updateLayout cr layout
   return layout
 
