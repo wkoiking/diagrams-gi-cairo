@@ -96,5 +96,6 @@ test-suite test-exe
                        gi-cairo-connector,
                        gi-pango,
                        gi-pangocairo,
+                       haskell-gi-base,
                        gi-gobject
   default-language: Haskell2010

@@ -19,10 +19,9 @@
 module Diagrams.Backend.Cairo where
 
 
-import           Control.Exception               (try)
+-- import           Control.Exception               (try)
 import           Control.Monad                   (when)
 import           Control.Monad.IO.Class
-import qualified Data.Array.MArray               as MA
 import           Data.Bits                       (rotateL, (.&.))
 import qualified Data.Foldable                   as F
 import           Data.Hashable                   (Hashable (..))
@@ -35,12 +34,12 @@ import           System.IO.Unsafe                (unsafePerformIO)
 
 import           Codec.Picture
 import           Codec.Picture.Types             (convertImage, packPixel,
-                                                  promoteImage, dynamicMap)
+                                                  promoteImage)
 
 -- <<< ’Ç‰Á
 -- import Foreign.C.Types
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
-import Diagrams.TwoD.Image (dimageSize)
+-- import Diagrams.TwoD.Image (dimageSize)
 -- >>> ’Ç‰Á
 
 import qualified Data.Vector.Storable as SV
@@ -59,10 +58,17 @@ import qualified GI.Cairo.Render.Connector as Connect
 import qualified GI.Pango as P
 -- gi-pangocairo
 import qualified GI.PangoCairo.Functions as P (showLayout, createLayout, updateLayout)
+-- gi-object
+import qualified GI.GObject.Objects.Object as GI (objectUnref)
+-- haskell-gi-base
+import qualified Data.GI.Base.ManagedPtr as GI (disownObject, disownBoxed)
+
 -- base
 import Data.Int (Int32)
 -- text
 import qualified Data.Text as T
+-- safe-exception
+import Control.Exception.Safe
 
 -- import Graphics.Rendering.Cairo (Format (..), formatStrideForWidth, renderWith, withImageSurfaceForData)
 -- import qualified Graphics.Rendering.Cairo        as C
@@ -400,7 +406,7 @@ renderEmbedded tr dImg = do
     let Image w' h' img = toImageRGBA8 dImg
         w = dynamicMap imageWidth dImg
         h = dynamicMap imageHeight dImg
-    let (fptr, len) = SV.unsafeToForeignPtr0 img
+    let (fptr, _len) = SV.unsafeToForeignPtr0 img
         pixelData = castPtr $ unsafeForeignPtrToPtr fptr
         sz = fromIntegral <$> dims2D w h
         stride = C.formatStrideForWidth C.FormatARGB32 w'
@@ -445,56 +451,58 @@ renderText
   -> Attributes
   -> Text Double
   -> C.Render ()
-renderText t attrs txt = do
-  let o = fromMaybe 1 (getAttr _Opacity attrs)
-      t' = t <> scaling (1 / avgScale t)
-  setTexture o $ getAttr _FillTexture attrs
-  layout <- layoutStyledText t' attrs txt
-  cr <- Connect.getContext
-  P.showLayout cr layout
-  C.newPath
-
--- getContext :: Render GI.Cairo.Context
--- toRender :: (GI.Cairo.Context -> IO a) -> Render a
-
-layoutStyledText
-  :: T2 Double
-  -> Attributes
-  -> Text Double
---   -> C.Render P.PangoLayout
-  -> C.Render P.Layout
-layoutStyledText tt sty (Text al str) = do
-  let tr = tt <> reflectionY
-      ff = fmap T.pack $ getAttr _Font sty
-      fs = fromFontSlant <$> getAttr _FontSlant sty
-      fw = fromFontWeight <$> getAttr _FontWeight sty
-      size' = fmap puToInt $ getAttr _FontSize sty
-  cairoTransf tr -- non-uniform scale
-  cr <- Connect.getContext
-  layout <- P.createLayout cr
-  P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
-  -- set font, including size
-  liftIO $ do
+renderText t sty (Text al str) = do
+    -- initializing
+    cr <- Connect.getContext
+    layout <- P.createLayout cr
     fontD <- P.fontDescriptionNew
+
+    -- non-uniform scale
+    let o = fromMaybe 1 (getAttr _Opacity sty)
+        tt = t <> scaling (1 / avgScale t)
+    setTexture o $ getAttr _FillTexture sty
+    let tr = tt <> reflectionY
+        ff = fmap T.pack $ getAttr _Font sty
+        fs = fromFontSlant <$> getAttr _FontSlant sty
+        fw = fromFontWeight <$> getAttr _FontWeight sty
+        size' = fmap puToInt $ getAttr _FontSize sty
+    cairoTransf tr
+
+    P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
+
+    -- set font, including size
     if' (P.fontDescriptionSetFamily fontD) ff
     if' (P.fontDescriptionSetStyle fontD) fs
     if' (P.fontDescriptionSetWeight fontD) fw
     if' (P.fontDescriptionSetSize fontD) size'
     P.layoutSetFontDescription layout $ Just fontD
-  -- geometric translation
-  ref <- liftIO $ case al of
-    BoxAlignedText xt yt -> do
-      (_, rect) <- P.layoutGetExtents layout
-      w <- fmap intToPu $ P.getRectangleWidth rect
-      h <- fmap intToPu $ P.getRectangleHeight rect
-      return $ r2 (w * xt, h * (1 - yt))
-    BaselineText -> do
-      baseline <- P.layoutIterGetBaseline =<< P.layoutGetIter layout
-      return $ r2 (0, fromIntegral baseline)
-  let t = moveOriginBy ref mempty :: T2 Double
-  cairoTransf t
-  P.updateLayout cr layout
-  return layout
+    -- geometric translation
+    iter <- P.layoutGetIter layout
+    ref <- case al of
+      BoxAlignedText xt yt -> do
+        (_, rectExtent) <- P.layoutGetExtents layout
+        w <- fmap intToPu $ P.getRectangleWidth rectExtent
+        h <- fmap intToPu $ P.getRectangleHeight rectExtent
+        return $ r2 (w * xt, h * (1 - yt))
+      BaselineText -> do
+        baseline <- fmap intToPu $ P.layoutIterGetBaseline iter
+        return $ r2 (0, baseline)
+    let t = moveOriginBy ref mempty :: T2 Double
+    cairoTransf t
+    -- update context
+    P.updateLayout cr layout
+    P.showLayout cr layout
+
+    C.newPath
+
+    -- finalizing
+    C.liftIO $ GI.disownBoxed iter
+    P.layoutIterFree iter
+    C.liftIO $ GI.disownBoxed fontD
+    P.fontDescriptionFree fontD
+    C.liftIO $ GI.disownObject layout
+    GI.objectUnref layout
+    return ()
 
 data PangoOptions = PangoOptions
   { pangoFont   :: Maybe String
@@ -537,13 +545,15 @@ lay PangoOptions{..} str = do
   layout <- P.createLayout cr
   P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
   -- set font, including size
-  C.liftIO $ do
-    fontD <- P.fontDescriptionNew
-    mapM_ (P.fontDescriptionSetFamily fontD) $ fmap T.pack pangoFont
-    P.fontDescriptionSetStyle fontD (fromFontSlant pangoSlant)
-    P.fontDescriptionSetWeight fontD (fromFontWeight pangoWeight)
-    P.fontDescriptionSetSize fontD $ puToInt pangoSize
-    P.layoutSetFontDescription layout $ Just fontD
+  fontD <- P.fontDescriptionNew
+  mapM_ (P.fontDescriptionSetFamily fontD) $ fmap T.pack pangoFont
+  P.fontDescriptionSetStyle fontD (fromFontSlant pangoSlant)
+  P.fontDescriptionSetWeight fontD (fromFontWeight pangoWeight)
+  P.fontDescriptionSetSize fontD $ puToInt pangoSize
+  P.layoutSetFontDescription layout $ Just fontD
+
+  C.liftIO $ GI.disownBoxed fontD
+  P.fontDescriptionFree fontD
 
   P.updateLayout cr layout
   return layout
@@ -556,19 +566,26 @@ fontBB :: PangoOptions -> String -> IO (BoundingBox V2 Double)
 fontBB opts str = do
   layout <- queryCairo $ lay opts str
   -- x0 and y0 correspond to the top left of the text from the cairo origin (top left)
-  (rect, _) <- P.layoutGetExtents layout
---   P.Rectangle x0 y0 w h
-  x0 <- fmap intToPu $ P.getRectangleX rect
-  y0 <- fmap intToPu $ P.getRectangleY rect
-  w <- fmap intToPu $ P.getRectangleWidth rect
-  h <- fmap intToPu $ P.getRectangleHeight rect
+  (rectExtent, _) <- P.layoutGetExtents layout
+  -- P.Rectangle x0 y0 w h
+  x0 <- fmap intToPu $ P.getRectangleX rectExtent
+  y0 <- fmap intToPu $ P.getRectangleY rectExtent
+  w <- fmap intToPu $ P.getRectangleWidth rectExtent
+  h <- fmap intToPu $ P.getRectangleHeight rectExtent
 
   -- the distance from the cairo origin to the diagrams baseline text origin
-  baseline <- fmap intToPu $ P.layoutIterGetBaseline =<< P.layoutGetIter layout
+  iter <- P.layoutGetIter layout
+  baseline <- fmap intToPu $ P.layoutIterGetBaseline iter
   -- y0 + h gives the distance of the cairo origin to the bottom of the
   -- text, subtracting this from the baseline gives the distance from
   -- the baseline to the bottom of the text
   let y = baseline - (y0 + h)
+
+  C.liftIO $ GI.disownBoxed iter
+  P.layoutIterFree iter
+  C.liftIO $ GI.disownObject layout
+  GI.objectUnref layout
+
   pure $ fromCorners (P2 x0 y) (P2 (x0 + w) (y + h))
 
 pangoTextIO

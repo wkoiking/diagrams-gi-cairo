@@ -2,6 +2,7 @@ module Main where
 
 -- gi-object
 import qualified GI.GObject.Objects.Object as GI (objectUnref)
+import qualified Data.GI.Base.ManagedPtr as GI (disownObject)
 -- gi-cairo-connector
 import qualified GI.Cairo.Render.Connector as Connect
 -- gi-pangocairo
@@ -27,6 +28,7 @@ renderText = do
     cr <- Connect.getContext
     layout <- P.createLayout cr
     GI.objectUnref layout
+    C.liftIO $ GI.disownObject layout
     return ()
 
 -- saveDiagram Cairo "Test.png" (mkWidth 500) $ center $ lw thick $ bg lightgray $ mconcat
