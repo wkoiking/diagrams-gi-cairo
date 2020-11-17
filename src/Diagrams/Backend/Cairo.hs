@@ -496,12 +496,12 @@ renderText t sty (Text al str) = do
     C.newPath
 
     -- finalizing
-    C.liftIO $ GI.disownBoxed iter
     P.layoutIterFree iter
-    C.liftIO $ GI.disownBoxed fontD
+    C.liftIO $ GI.disownBoxed iter
     P.fontDescriptionFree fontD
-    C.liftIO $ GI.disownObject layout
+    C.liftIO $ GI.disownBoxed fontD
     GI.objectUnref layout
+    C.liftIO $ GI.disownObject layout
     return ()
 
 data PangoOptions = PangoOptions
@@ -552,8 +552,8 @@ lay PangoOptions{..} str = do
   P.fontDescriptionSetSize fontD $ puToInt pangoSize
   P.layoutSetFontDescription layout $ Just fontD
 
-  C.liftIO $ GI.disownBoxed fontD
   P.fontDescriptionFree fontD
+  C.liftIO $ GI.disownBoxed fontD
 
   P.updateLayout cr layout
   return layout
@@ -581,10 +581,10 @@ fontBB opts str = do
   -- the baseline to the bottom of the text
   let y = baseline - (y0 + h)
 
-  C.liftIO $ GI.disownBoxed iter
   P.layoutIterFree iter
-  C.liftIO $ GI.disownObject layout
+  C.liftIO $ GI.disownBoxed iter
   GI.objectUnref layout
+  C.liftIO $ GI.disownObject layout
 
   pure $ fromCorners (P2 x0 y) (P2 (x0 + w) (y + h))
 
