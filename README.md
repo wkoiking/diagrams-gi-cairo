@@ -25,7 +25,7 @@ Difference from `diagrams-cairo` is as below:
 You need to specify below extra-deps in stack.yaml to build this package:
 
 ~~~
-resolver: lts-16.10
+resolver: lts-17.0
 
 packages:
 - '.'
