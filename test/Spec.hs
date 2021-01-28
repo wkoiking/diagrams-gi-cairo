@@ -1,37 +1,27 @@
 module Main where
 
--- gi-object
-import qualified GI.GObject.Objects.Object as GI (objectUnref)
-import qualified Data.GI.Base.ManagedPtr as GI (disownObject)
--- gi-cairo-connector
-import qualified GI.Cairo.Render.Connector as Connect
--- gi-pangocairo
-import qualified GI.PangoCairo.Functions as P (createLayout)
--- gi-cairo-render
-import qualified GI.Cairo.Render as C
-import GI.Cairo.Render (renderWith, createImageSurface, Format(..))
--- base
-import Control.Monad (forever, replicateM_)
-import Control.Concurrent (threadDelay)
+import GI.Cairo.Render
+
+-- -- diagrams
+-- import Diagrams.Prelude
+-- import Diagrams.TwoD.Text
+-- -- diagrams-gi-cairo
+-- import Diagrams.Backend.Cairo (Cairo(..))
+
+drawRectangle :: Render ()
+drawRectangle = do
+    setSourceRGB 1.0 0.0 0.0    -- set the source layer to red color
+    setLineWidth 10             -- set virtual pen width
+    rectangle 50 50 100 100     -- draw a rectangle at (50,50)
+    stroke                      -- transfer to mask
 
 main :: IO ()
 main = do
-    cairoSurface <- createImageSurface FormatRGB24 500 500
-    forever $ do
-        putStrLn "Rendering ..."
-        renderWith cairoSurface $ replicateM_ 500 $ renderText
-        threadDelay 1000000
+    withPDFSurface "sample.pdf" 100 100 $ \ surface -> do
+        renderWith surface drawRectangle
 
-renderText
-  :: C.Render ()
-renderText = do
-    cr <- Connect.getContext
-    layout <- P.createLayout cr
-    GI.objectUnref layout
-    C.liftIO $ GI.disownObject layout
-    return ()
-
--- saveDiagram Cairo "Test.png" (mkWidth 500) $ center $ lw thick $ bg lightgray $ mconcat
---     [ circle 2
---     , rotate (45 @@ deg) $ font "Arial" $ fontWeight FontWeightBold $ fc blue $ text "ABC"
+-- main :: IO ()
+-- main = saveDiagram Cairo "Test.png" (mkWidth 300) $ center $ lw thick $ bg lightgray $ mconcat
+--     [ rect 20 5
+--     , text "あいうえお↓↑"
 --     ]

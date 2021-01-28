@@ -36,11 +36,11 @@ import           Codec.Picture
 import           Codec.Picture.Types             (convertImage, packPixel,
                                                   promoteImage)
 
--- <<< ’Ç‰Á
+-- <<< è¿½åŠ 
 -- import Foreign.C.Types
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 -- import Diagrams.TwoD.Image (dimageSize)
--- >>> ’Ç‰Á
+-- >>> è¿½åŠ 
 
 import qualified Data.Vector.Storable as SV
 import Foreign.ForeignPtr (newForeignPtr)
@@ -49,13 +49,12 @@ import Foreign.Marshal.Array (callocArray)
 import Foreign.Ptr (Ptr, castPtr)
 
 -- gi-cairo-render
-import GI.Cairo.Render (Format (..), formatStrideForWidth, renderWith, withImageSurfaceForData)
-import qualified GI.Cairo.Render as C
-import qualified GI.Cairo.Render.Matrix as CM
+import qualified GI.Cairo.Render as C (withImageSurfaceForData, Surface, imageSurfaceGetWidth, imageSurfaceGetHeight, setSourceSurface, paint, formatStrideForWidth, createImageSurfaceForData, imageSurfaceCreateFromPNG, setSourceRGBA, withLinearPattern, patternSetMatrix, patternSetExtend, setSource, withRadialPattern, patternSetMatrix, patternSetExtend, liftIO, moveTo, closePath, save, restore, clip, setFillRule, setLineWidth, setLineCap, setLineJoin, setLineJoin, setDash, transform, fillPreserve, stroke, relLineTo, relCurveTo, newPath, LineCap(..), LineJoin(..), FillRule(..), Render, renderWith, withPDFSurface, withSVGSurface, withPSSurface, withImageSurface, Format(..), Pattern, Extend(..), patternAddColorStopRGBA, surfaceWriteToPNG)
+import qualified GI.Cairo.Render.Matrix as CM (Matrix(..))
 -- gi-cairo-connector
 import qualified GI.Cairo.Render.Connector as Connect
 -- gi-pango
-import qualified GI.Pango as P
+import qualified GI.Pango as P (Style(..), Weight(..), fontDescriptionNew, layoutSetText, fontDescriptionSetFamily, fontDescriptionSetStyle, fontDescriptionSetWeight, fontDescriptionSetSize, layoutSetFontDescription, layoutGetIter, layoutGetExtents, getRectangleWidth, getRectangleHeight, layoutIterGetBaseline, layoutIterFree, fontDescriptionFree, Layout, layoutSetText, fontDescriptionNew, fontDescriptionSetFamily, fontDescriptionSetStyle, fontDescriptionSetWeight, fontDescriptionSetSize, layoutSetFontDescription, fontDescriptionFree, layoutGetExtents, getRectangleX, getRectangleY)
 -- gi-pangocairo
 import qualified GI.PangoCairo.Functions as P (showLayout, createLayout, updateLayout)
 -- gi-object
@@ -67,6 +66,9 @@ import qualified Data.GI.Base.ManagedPtr as GI (disownObject, disownBoxed)
 import Data.Int (Int32)
 -- text
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T (encodeUtf8)
+-- bytestriing
+import qualified Data.ByteString as B
 -- safe-exception
 import Control.Exception.Safe
 
@@ -468,7 +470,8 @@ renderText t sty (Text al str) = do
         size' = fmap puToInt $ getAttr _FontSize sty
     cairoTransf tr
 
-    P.layoutSetText layout (T.pack str) (fromIntegral $ length str)
+    let txt = T.pack str
+    P.layoutSetText layout txt (fromIntegral $ B.length $ T.encodeUtf8 txt)
 
     -- set font, including size
     if' (P.fontDescriptionSetFamily fontD) ff
@@ -620,17 +623,17 @@ pangoText = pangoText' def
 -- Rendering -----------------------------------------------------------
 
 -- | Rasterise a 'C.Render' to a raw pointer.
-rasterPtr :: Int -> Int -> Format -> C.Render () -> IO (Ptr Word8)
+rasterPtr :: Int -> Int -> C.Format -> C.Render () -> IO (Ptr Word8)
 rasterPtr w h fmt r = do
-  let stride = formatStrideForWidth fmt w
+  let stride = C.formatStrideForWidth fmt w
   b <- callocArray (stride * h)
-  withImageSurfaceForData b fmt w h stride (`renderWith` r)
+  C.withImageSurfaceForData b fmt w h stride (`C.renderWith` r)
   pure (castPtr b)
 
 -- | Rasterise a 'C.Render' to a JuicyPixels image.
 rasterImage :: Int -> Int -> C.Render () -> IO (Image PixelRGBA8)
 rasterImage w h render = do
-  ptr  <- rasterPtr w h FormatARGB32 render
+  ptr  <- rasterPtr w h C.FormatARGB32 render
   fptr <- newForeignPtr finalizerFree ptr
   let vec = SV.unsafeFromForeignPtr0 fptr (w*h*4)
   -- cairo uses bgr
